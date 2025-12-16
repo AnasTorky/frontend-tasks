@@ -1,7 +1,7 @@
-import { Component } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { CommonModule } from '@angular/common';
+import { Component, Inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Post } from './post.model';
 
 @Component({
   selector: 'app-root',
@@ -11,71 +11,101 @@ import { FormsModule } from '@angular/forms';
   styleUrls: ['./app.css']
 })
 export class AppComponent {
-  postId: string = '';
-  title: string = '';
-  body: string = '';
-  result: any = {};
 
-  constructor(private http: HttpClient) {}
+  postId: number | null = null;
+  title = '';
+  body = '';
 
+  posts: Post[] = [];
+  selectedPost: Post | null = null;
+
+  private storageKey = 'posts';
+  private isBrowser = false;
+
+  constructor(@Inject(PLATFORM_ID) platformId: Object) {
+    this.isBrowser = isPlatformBrowser(platformId);
+    if (this.isBrowser) this.loadPosts();
+  }
+
+  // Load posts from LocalStorage
+  loadPosts() {
+    const data = localStorage.getItem(this.storageKey);
+    this.posts = data ? JSON.parse(data) : [];
+  }
+
+  // Save posts to LocalStorage
+  savePosts() {
+    if (!this.isBrowser) return;
+    localStorage.setItem(this.storageKey, JSON.stringify(this.posts));
+  }
+
+  // CREATE
   createPost() {
-    if (!this.title || !this.body) {
-      alert('Please enter title and body');
-      return;
-    }
-
-    const postData = {
-      title: this.title,
-      body: this.body,
-      userId: 1
-    };
-
-    this.http.post('https://jsonplaceholder.typicode.com/posts', postData)
-      .subscribe(response => {
-        this.result = response;
-      });
-  }
-
-  readPost() {
-    if (!this.postId) {
-      alert('Enter Post ID');
-      return;
-    }
-
-    this.http.get(`https://jsonplaceholder.typicode.com/posts/${this.postId}`)
-      .subscribe(response => {
-        this.result = response;
-      });
-  }
-
-  updatePost() {
     if (!this.postId || !this.title || !this.body) {
-      alert('Enter Post ID, Title and Body');
+      alert('Please enter ID, title and body');
       return;
     }
 
-    const postData = {
+    if (this.posts.find(p => p.id === this.postId)) {
+      alert('ID already exists!');
+      return;
+    }
+
+    const newPost: Post = {
       id: this.postId,
       title: this.title,
-      body: this.body,
-      userId: 1
+      body: this.body
     };
 
-    this.http.put(`https://jsonplaceholder.typicode.com/posts/${this.postId}`, postData)
-      .subscribe(response => {
-        this.result = response;
-      });
+    this.posts.push(newPost);
+    this.savePosts();
+    this.clearForm();
   }
 
-  deletePost() {
-    if (!this.postId) {
-      alert('Enter Post ID');
+  // READ
+  readPost() {
+    if (!this.postId) return;
+
+    this.selectedPost = this.posts.find(p => p.id === this.postId) || null;
+
+    if (!this.selectedPost) alert('Post not found');
+  }
+
+  // UPDATE
+  updatePost() {
+    if (!this.postId) return;
+
+    const index = this.posts.findIndex(p => p.id === this.postId);
+    if (index === -1) {
+      alert('Post not found');
       return;
     }
 
-    this.http.delete(`https://jsonplaceholder.typicode.com/posts/${this.postId}`)
-      .subscribe(() => {
-        this.result = { status: 200, message: 'Deleted successfully' };
-      });
+    this.posts[index].title = this.title;
+    this.posts[index].body = this.body;
+    this.savePosts();
+    this.clearForm();
+  }
+
+  // DELETE
+  deletePost() {
+    if (!this.postId) return;
+
+    const index = this.posts.findIndex(p => p.id === this.postId);
+    if (index === -1) {
+      alert('Post not found');
+      return;
+    }
+
+    this.posts.splice(index, 1);
+    this.savePosts();
+    this.clearForm();
+  }
+
+  clearForm() {
+    this.postId = null;
+    this.title = '';
+    this.body = '';
+    this.selectedPost = null;
   }
 }
